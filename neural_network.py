@@ -50,7 +50,7 @@ def readFaceData(filename):
 
     return facesData
 
-def getFeatures(data, height, width, delimiter):
+def getFaceFeatures(data, height, width, delimiter):
     features = []
     for i in range(height):
         for j in range(width):
@@ -59,6 +59,19 @@ def getFeatures(data, height, width, delimiter):
             else:
                 features.append(0)
     return features
+
+def getDigitFeatures(data, height, width, delimiter1, delimiter2):
+    features = []
+    for i in range(height):
+        for j in range(width):
+            if(data[i][j]==delimiter1):
+                features.append(1)
+            elif(data[i][j]==delimiter2):   
+                features.append(2)
+            else:
+                features.append(0)
+    return features
+
 def cutData(data, labels, percentData):
     newData = []
     numData = len(data)
@@ -100,13 +113,38 @@ def readDigitLabels(filename):
     return data
 
 
-def computeFaceAvgPredErr(testData, testLabels, trainingData, trainingLabels):
+def computeFaceAvgPredErr(testData, testLabels, trainingFeatures, trainingLabels):
 
     acc = []
     for _ in range(5):
         mlp = MLPClassifier(hidden_layer_sizes=(8,8,8), activation='relu', solver='adam', max_iter=500)
-        mlp.fit(trainingData, trainingLabels)
-        predict_test = mlp.predict(testData)
+        mlp.fit(trainingFeatures, trainingLabels)
+        testFeatures = []
+        for face in testData:
+            testFeatures.append(getFaceFeatures(face, 70, 60, '#'))
+        predict_test = mlp.predict(testFeatures)
+        count = 0
+        for i, p in enumerate(predict_test):
+            if(p == testLabels[i]):
+                count+=1
+        prob = count /len(predict_test)
+        acc.append(prob)
+    arr = np.array(acc)
+    mean = np.mean(arr)
+    std_dev = np.std(arr)
+
+    return mean, std_dev
+
+def computeDigitAvgPredErr(testData, testLabels, trainingFeatures, trainingLabels):
+
+    acc = []
+    for _ in range(5):
+        mlp = MLPClassifier(hidden_layer_sizes=(8,8,8), activation='relu', solver='adam', max_iter=500)
+        mlp.fit(trainingFeatures, trainingLabels)
+        testFeatures = []
+        for digit in testData:
+            testFeatures.append(getDigitFeatures(digit, 28, 28, '+', '#'))
+        predict_test = mlp.predict(testFeatures)
         count = 0
         for i, p in enumerate(predict_test):
             if(p == testLabels[i]):
@@ -130,12 +168,39 @@ def getFaceStats():
 
     for multiplier in range(1,11):
         newTrainingData, newTrainingLabels = cutData(trainingData, trainingLabels, multiplier * 0.1)
+        features = []
+        for face in newTrainingData:
+            features.append(getFaceFeatures(face, 70, 60, '#'))
         t1_start = perf_counter()
         mlp = MLPClassifier(hidden_layer_sizes=(8,8,8), activation='relu', solver='adam', max_iter=500)
-        mlp.fit(newTrainingData, newTrainingLabels)
+        mlp.fit(features, newTrainingLabels)
         t1_stop = perf_counter()  
-        print("Elapsed time in seconds:"+str(t1_stop-t1_start))
-        mean, std_dev = computeFaceAvgPredErr(testData, testLabels, newTrainingData, newTrainingLabels)
+        print("Elapsed time in seconds:"+str(t1_stop-t1_start)+"\t for "+str(multiplier*10)+"% of data")
+        mean, std_dev = computeFaceAvgPredErr(testData, testLabels, features, newTrainingLabels)
         print("Mean accuracy: "+str(mean * 100) + "%\t Std Dev: "+ str(std_dev * 100))
 
-getFaceStats()
+def getDigitStats():
+    trainingData = readDigitData("trainingimages")
+    trainingLabels = readDigitLabels("traininglabels")
+    validationData = readDigitData("validationimages")
+    validationLabels = readDigitLabels("validationlabels")
+    testData = readDigitData("testimages")
+    testLabels = readDigitLabels("testlabels")
+    
+
+    for multiplier in range(1,11):
+        newTrainingData, newTrainingLabels = cutData(trainingData, trainingLabels, multiplier * 0.1)
+        features = []
+        for digit in newTrainingData:
+            features.append(getDigitFeatures(digit, 28, 28, '+', '#'))
+        t1_start = perf_counter()
+        mlp = MLPClassifier(hidden_layer_sizes=(8,8,8), activation='relu', solver='adam', max_iter=500)
+        mlp.fit(features, newTrainingLabels)
+        t1_stop = perf_counter()  
+        print("Elapsed time in seconds:"+str(t1_stop-t1_start)+"\t for "+str(multiplier*10)+"% of data")
+        mean, std_dev = computeDigitAvgPredErr(testData, testLabels, features, newTrainingLabels)
+        print("Mean accuracy: "+str(mean * 100) + "%\t Std Dev: "+ str(std_dev * 100))
+
+#getFaceStats()
+
+getDigitStats()
